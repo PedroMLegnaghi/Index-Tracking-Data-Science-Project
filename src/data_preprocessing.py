@@ -456,31 +456,3 @@ class DataPreprocessor:
             return index_clean, stocks_clean
 
 
-def main():
-    """Função principal para teste do módulo."""
-    # Carregar dados de exemplo
-    print("Carregando dados de exemplo...")
-    index_data = pd.read_csv('../data/sp100_index.csv', index_col=0, parse_dates=True)
-    stocks_data = pd.read_csv('../data/sp100_stocks.csv', index_col=0, parse_dates=True)
-    
-    # Criar pré-processador
-    preprocessor = DataPreprocessor(
-        max_missing_pct=0.1,
-        max_consecutive_missing=30,
-        outlier_std_threshold=5.0
-    )
-    
-    # Executar pipeline
-    index_returns, stocks_returns = preprocessor.preprocess_pipeline(
-        index_data, stocks_data, calculate_ret=True
-    )
-    
-    # Salvar dados processados
-    index_returns.to_csv('../data/sp100_index_returns.csv')
-    stocks_returns.to_csv('../data/sp100_stocks_returns.csv')
-    
-    print("✓ Dados processados salvos com sucesso!")
-
-
-if __name__ == "__main__":
-    main()
