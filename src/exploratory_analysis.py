@@ -405,6 +405,7 @@ class ExploratoryAnalyzer:
         # 2. Séries temporais (cumulativo)
         print("\n--- 3. VISUALIZAÇÃO DE RETORNOS CUMULATIVOS ---")
         cumulative = (1 + stocks_returns).cumprod()
+        
         cumulative_index = (1 + index_returns).cumprod()
         
         # Plotar índice
@@ -416,7 +417,7 @@ class ExploratoryAnalyzer:
         # Plotar algumas ações
         save_path_2 = f"{save_dir}/02_retornos_cumulativos_acoes.png" if save_dir else None
         self.plot_time_series(cumulative.iloc[:, :10], 
-                            title="Retornos Cumulativos: Top 10 Ações",
+                            title="Retornos Cumulativos das 10 primeiras ações",
                             normalize=True, save_path=save_path_2)
         
         # 3. Distribuição de retornos
