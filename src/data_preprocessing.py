@@ -46,29 +46,24 @@ class DataPreprocessor:
     Attributes:
         max_missing_pct (float): Percentual máximo permitido de dados faltantes (0-1)
         max_consecutive_missing (int): Número máximo de dias consecutivos faltantes
-        outlier_std_threshold (float): Número de desvios padrão para considerar outlier
     """
     
     def __init__(self, 
                  max_missing_pct: float = 0.1,
-                 max_consecutive_missing: int = 30,
-                 outlier_std_threshold: float = 5.0):
+                 max_consecutive_missing: int = 30,):
         """
         Inicializa o pré-processador.
         
         Args:
             max_missing_pct: Percentual máximo de dados faltantes (padrão: 10%)
             max_consecutive_missing: Máximo de dias consecutivos faltantes (padrão: 30)
-            outlier_std_threshold: Threshold para detecção de outliers (padrão: 5 desvios)
         """
         self.max_missing_pct = max_missing_pct
         self.max_consecutive_missing = max_consecutive_missing
-        self.outlier_std_threshold = outlier_std_threshold
         
         print(f"✓ DataPreprocessor inicializado:")
         print(f"  - Max missing: {max_missing_pct*100:.1f}%")
         print(f"  - Max consecutive missing: {max_consecutive_missing} dias")
-        print(f"  - Outlier threshold: ±{outlier_std_threshold} desvios padrão")
     
     def check_missing_data(self, data: pd.DataFrame) -> pd.DataFrame:
         """
@@ -215,92 +210,6 @@ class DataPreprocessor:
         
         return data_interpolated
     
-    def detect_outliers(self, data: pd.DataFrame, method: str = 'zscore') -> pd.DataFrame:
-        """
-        Detecta outliers nos dados.
-        
-        Args:
-            data: DataFrame a ser analisado
-            method: Método de detecção ('zscore' ou 'iqr')
-            
-        Returns:
-            DataFrame booleano indicando outliers
-        """
-        print(f"\n🔍 Detectando outliers usando método: {method}")
-        
-        if method == 'zscore':
-            # Z-score method
-            z_scores = np.abs((data - data.mean()) / data.std())
-            outliers = z_scores > self.outlier_std_threshold
-        
-        elif method == 'iqr':
-            # Interquartile Range method
-            Q1 = data.quantile(0.25)
-            Q3 = data.quantile(0.75)
-            IQR = Q3 - Q1
-            outliers = (data < (Q1 - 1.5 * IQR)) | (data > (Q3 + 1.5 * IQR))
-        
-        else:
-            raise ValueError("method deve ser 'zscore' ou 'iqr'")
-        
-        total_outliers = outliers.sum().sum()
-        pct_outliers = (total_outliers / (data.shape[0] * data.shape[1]) * 100)
-        
-        print(f"✓ Outliers detectados: {total_outliers} ({pct_outliers:.2f}% dos dados)")
-        
-        # Mostrar colunas com mais outliers
-        outliers_per_col = outliers.sum().sort_values(ascending=False).head(10)
-        if len(outliers_per_col) > 0:
-            print(f"\n  Top colunas com outliers:")
-            for col, count in outliers_per_col.items():
-                print(f"    {col}: {count} outliers")
-        
-        return outliers
-    
-    def treat_outliers(self, data: pd.DataFrame, outliers: pd.DataFrame, 
-                      method: str = 'winsorize') -> pd.DataFrame:
-        """
-        Trata outliers detectados.
-        
-        Args:
-            data: DataFrame original
-            outliers: DataFrame booleano com outliers marcados
-            method: Método de tratamento ('winsorize', 'remove', 'median')
-            
-        Returns:
-            DataFrame com outliers tratados
-        """
-        print(f"\n🔧 Tratando outliers usando método: {method}")
-        
-        data_treated = data.copy()
-        
-        if method == 'winsorize':
-            # Substituir outliers por valores nos percentis 1% e 99%
-            lower = data.quantile(0.01)
-            upper = data.quantile(0.99)
-            
-            for col in data.columns:
-                data_treated.loc[outliers[col] & (data[col] < lower[col]), col] = lower[col]
-                data_treated.loc[outliers[col] & (data[col] > upper[col]), col] = upper[col]
-        
-        elif method == 'median':
-            # Substituir outliers pela mediana da coluna
-            for col in data.columns:
-                median_val = data[col].median()
-                data_treated.loc[outliers[col], col] = median_val
-        
-        elif method == 'remove':
-            # Remover linhas com outliers (cuidado!)
-            mask = ~outliers.any(axis=1)
-            data_treated = data[mask]
-            print(f"  ⚠ Linhas removidas: {len(data) - len(data_treated)}")
-        
-        else:
-            raise ValueError("method deve ser 'winsorize', 'median' ou 'remove'")
-        
-        print(f"✓ Tratamento de outliers concluído")
-        
-        return data_treated
     
     def calculate_returns(self, prices: pd.DataFrame, method: str = 'log') -> pd.DataFrame:
         """
@@ -327,10 +236,6 @@ class DataPreprocessor:
         # Remover primeira linha (NaN)
         returns = returns.dropna()
         
-        print(f"✓ Retornos calculados: {len(returns)} períodos")
-        print(f"  Estatísticas médias:")
-        print(f"    Retorno médio: {returns.mean().mean()*100:.4f}%")
-        print(f"    Volatilidade média: {returns.std().mean()*100:.4f}%")
         
         return returns
     
@@ -363,24 +268,15 @@ class DataPreprocessor:
         return index_aligned, stocks_aligned
     
     def preprocess_pipeline(self, index_data: pd.DataFrame, stocks_data: pd.DataFrame,
-                          calculate_ret: bool = True, treat_outliers: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame]:
+                          calculate_ret: bool = True) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         Pipeline completo de pré-processamento para Index Tracking.
         Transforma dados brutos → dados prontos para otimização
 
-        ⚠️ IMPORTANTE: Outliers NÃO são tratados por padrão!
-        
-        JUSTIFICATIVA:
-        Para Index Tracking, eventos extremos (crashes, rallies) são PARTE DO OBJETIVO.
-        O modelo deve replicar o índice inclusive em situações extremas. Tratar outliers
-        artificialmente reduzirá o tracking error no treino mas piorará a performance
-        out-of-sample em períodos de alta volatilidade.
-        
         Args:
             index_data: DataFrame do índice (OHLCV)
             stocks_data: DataFrame das ações (preços ajustados)
             calculate_ret: Se True, calcula retornos logarítmicos ao final (padrão: True)
-            treat_outliers: Se True, detecta e trata outliers (NÃO recomendado para IT, padrão: False)
             
         Returns:
             Tupla (index_processed, stocks_processed)
@@ -410,8 +306,6 @@ class DataPreprocessor:
         
         # 5. Detectar e tratar outliers (DESABILITADO por padrão para Index Tracking)
         # 
-        # ⚠️ DECISÃO DE DESIGN: Outliers NÃO devem ser tratados para Index Tracking!
-        #
         # JUSTIFICATIVA:
         # - Objetivo: Replicar o índice (inclusive em eventos extremos como crashes)
         # - Outliers são REAIS (COVID-19, crises financeiras, etc.)
@@ -419,11 +313,6 @@ class DataPreprocessor:
         # - Tratar outliers artificialmente reduz TE no treino, mas piora out-of-sample
         # - Retornos logarítmicos já limitam naturalmente valores extremos
         #
-        # Para ativar (outros projetos), use: treat_outliers=True no pipeline
-        if treat_outliers:
-            print(f"\n⚠️ TRATANDO OUTLIERS (não recomendado para Index Tracking)")
-            outliers = self.detect_outliers(stocks_clean, method='zscore')
-            stocks_clean = self.treat_outliers(stocks_clean, outliers, method='winsorize')
         
         # 6. Calcular retornos
         if calculate_ret:
