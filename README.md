@@ -43,6 +43,9 @@ Projeto desenvolvido no Bootcamp de Introdução à Data Science (Associação F
 - `src/visualization.py`: Gráficos de performance, TE e janelas rolantes.
 - `notebooks/06_Projeto_Completo.ipynb`: Apresentação completa do projeto.
 
+**Como Visualizar (Notebook)**
+-Abra a pasta "notebooks"
+-Abra o arquivo "06_Projeto_Completo.ipynb", os resultados já estão carregados e prontos para serem visualizados
 
 **Como Rodar (Notebook)**
 - Abra `notebooks/06_Projeto_Completo.ipynb` no VS Code/Jupyter.
